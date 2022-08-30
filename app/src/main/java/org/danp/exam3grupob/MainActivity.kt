@@ -3,17 +3,23 @@ package org.danp.exam3grupob
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import org.danp.exam3grupob.databinding.ActivityMainBinding
+import java.io.FileInputStream
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -23,12 +29,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var viewBinding: ActivityMainBinding
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
+    private var imageButton: ImageButton? = null;
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
+
+        //imageView2=viewBinding.imageViewTop
+        imageButton = viewBinding.imageButton
 
         if (allPermissionsGranted()) {
             startCamera()
@@ -97,12 +107,34 @@ class MainActivity : AppCompatActivity() {
 
             imageCapture = ImageCapture.Builder().build()
 
+//YUV FORMAT by default
+            val imageAnalyzerProcess = ImageAnalyzerProcess()
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor, imageAnalyzerProcess)
+                }
+//RGB FORMAT
+//            val imageAnalyzerProcess = ImageAnalyzerProcess()
+//            val imageAnalyzer = ImageAnalysis.Builder().setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+//                .build()
+//                .also {
+//                    it.setAnalyzer(cameraExecutor, imageAnalyzerProcess)
+//                }
+
+            imageAnalyzerProcess.listener = {
+                lifecycleScope.launch {
+                    imageButton?.setImageBitmap(it)
+                }
+//                Log.d(TAG, "listener ")
+            }
+
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture
+                    this, cameraSelector, preview, imageCapture, imageAnalyzer
                 )
 
             } catch (exc: Exception) {
@@ -113,6 +145,46 @@ class MainActivity : AppCompatActivity() {
 
 
     }
+
+
+//    private class ImageAnalyzer(
+//    ) : ImageAnalysis.Analyzer {
+//
+//        var listener: (()->Unit)? = null
+//
+//        private fun ByteBuffer.toByteArray(): ByteArray {
+//            rewind()    // Rewind the buffer to zero
+//            val data = ByteArray(remaining())
+//            get(data)   // Copy the buffer into a byte array
+//            return data // Return the byte array
+//        }
+//
+//        private fun Image.toBitmap(): Bitmap {
+//            val buffer = planes[0].buffer
+//            buffer.rewind()
+//            val bytes = ByteArray(buffer.capacity())
+//            buffer.get(bytes)
+//            return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+//        }
+//
+//        @SuppressLint("UnsafeOptInUsageError")
+//        override fun analyze(imageProxy: ImageProxy) {
+//            Log.d(TAG, "ImageProxy")
+//            val buffer = imageProxy.planes[0].buffer
+//            val data = buffer.toByteArray()
+//            //val pixels = data.map { it.toInt() and 0xFF }
+//            val pixels = data.map {
+//                Log.d(TAG, "" + it.toInt())
+//            }
+//
+//            var imgBitmap = imageProxy.image?.toBitmap()
+//            //imageView.setImageBitmap(imgBitmap)
+//            listener?.invoke()
+//            imageProxy.close()
+//
+//        }
+//
+//    }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
 
